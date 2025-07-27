@@ -5,11 +5,17 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
-import urllib.request
 import tempfile
-from urllib.error import URLError
 from pathlib import Path
 import queue
+
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    import urllib.request
+    from urllib.error import URLError
+    HAS_REQUESTS = False
 
 
 def get_espota_path() -> str:
@@ -300,17 +306,44 @@ class CleverCoffeeOtaFlasher:
             for filename, url in self.binary_urls.items():
                 try:
                     self.log_message(f"⬇️ Downloading {filename}...")
-
                     local_path = download_dir / filename
 
-                    # Download with progress indication
-                    def progress_hook(block_num, block_size, total_size):
-                        if total_size > 0:
-                            percent = min(100, (block_num * block_size * 100) // total_size)
-                            if percent % 20 == 0 and percent > 0:  # Log every 20%
-                                self.log_message(f"   Progress: {percent}%")
+                    if HAS_REQUESTS:
+                        # Use requests for better SSL handling
+                        response = requests.get(url, stream=True, timeout=30)
+                        response.raise_for_status()
 
-                    urllib.request.urlretrieve(url, str(local_path), progress_hook)
+                        total_size = int(response.headers.get('content-length', 0))
+
+                        with open(local_path, 'wb') as f:
+                            downloaded = 0
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                                    downloaded += len(chunk)
+                                    if total_size > 0:
+                                        percent = (downloaded * 100) // total_size
+                                        if percent % 20 == 0 and percent > 0:
+                                            self.log_message(f"   Progress: {percent}%")
+                    else:
+                        # Fallback to urllib with SSL context workaround
+                        import ssl
+
+                        # Create unverified SSL context (less secure but works)
+                        ssl_context = ssl.create_default_context()
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+
+                        def progress_hook(block_num, block_size, total_size):
+                            if total_size > 0:
+                                percent = min(100, (block_num * block_size * 100) // total_size)
+                                if percent % 20 == 0 and percent > 0:
+                                    self.log_message(f"   Progress: {percent}%")
+
+                        # Use the SSL context with urllib
+                        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+                        urllib.request.install_opener(opener)
+                        urllib.request.urlretrieve(url, str(local_path), progress_hook)
 
                     # Verify file was downloaded and has content
                     if local_path.exists() and local_path.stat().st_size > 0:
@@ -329,13 +362,16 @@ class CleverCoffeeOtaFlasher:
                     else:
                         self.log_message(f"❌ Downloaded {filename} but file is empty or missing")
 
-                except URLError as e:
-                    self.log_message(f"❌ Network error downloading {filename}: {str(e)}")
                 except Exception as e:
                     self.log_message(f"❌ Failed to download {filename}: {str(e)}")
+                    # Additional SSL-specific error info
+                    if "SSL" in str(e) or "certificate" in str(e).lower():
+                        self.log_message(f"💡 SSL certificate issue detected. This is common with bundled apps.")
+                        self.log_message(
+                            f"   Try downloading files manually from: https://github.com/{self.github_repo}/releases/tag/{self.github_release_tag}")
 
             if success_count == total_files:
-                self.log_message(f"Successfully downloaded all {total_files} files!")
+                self.log_message(f"✅ Successfully downloaded all {total_files} files!")
                 self.log_message(f"📂 Files saved to: {download_dir}")
                 self.log_message(
                     f"💡 Files are ready for OTA upload. Check desired options and click 'Start OTA Upload'.")
@@ -344,6 +380,8 @@ class CleverCoffeeOtaFlasher:
                 self.log_message(f"📂 Files saved to: {download_dir}")
             else:
                 self.log_message("❌ Failed to download any files. Please check your internet connection.")
+                self.log_message(
+                    f"💡 Manual download: https://github.com/{self.github_repo}/releases/tag/{self.github_release_tag}")
 
         except Exception as e:
             self.log_message(f"❌ Download error: {str(e)}")
