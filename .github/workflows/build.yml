@@ -1,0 +1,29 @@
+# .github/workflows/build.yml
+
+name: Build Executables
+on: [push, release]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --windowed clevercoffee_ota_flasher.py
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: executable-${{ matrix.os }}
+        path: dist/
+
