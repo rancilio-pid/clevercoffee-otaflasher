@@ -31,25 +31,3 @@ You can either use the system python executable or install the package python-tk
 4. Set port (default: 3232) and password (default in the firmware: "otapass")
 5. Click "Start Upload"
 
-## Running the provided app bundle on macOS
-
-Due to Apple's security requirements, you may see a warning when first opening the app since we're not able to sign the code.
-
-**To run the application:**
-1. Right-click on `CleverCoffee-OTA-Flasher.app`
-2. Select "Open" from the context menu
-3. Click "Open" in the security dialog
-4. The app will launch and be trusted for future use
-
-Alternatively, go to **System Preferences > Privacy & Security** and click "Open Anyway" when prompted.
-
-**If this still doesn't work:**
-
-1. **Open Terminal** and run:
-   ```bash
-   sudo xattr -rd com.apple.quarantine /path/to/CleverCoffee-OTA-Flasher.app
-   ```
-   (Replace `/path/to/` with the actual path where you downloaded the app)
-
-
-2. **Double-click the app** - it should now open normally
