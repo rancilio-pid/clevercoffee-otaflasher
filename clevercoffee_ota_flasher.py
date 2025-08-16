@@ -95,7 +95,7 @@ class CleverCoffeeOtaFlasher:
 
         # GitHub release info
         # TODO hardcoded for pre-release
-        self.github_release_tag = "v4.0.0-beta2"
+        self.github_release_tag = "v4.0.0-beta3"
         self.github_repo = "rancilio-pid/clevercoffee"
         self.binary_urls = {
             "firmware.bin": f"https://github.com/{self.github_repo}/releases/download/{self.github_release_tag}/firmware.bin",
